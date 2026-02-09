@@ -1,0 +1,340 @@
+﻿<!DOCTYPE html>
+<html class="light" lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Customers - Phone Store Management</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style type="text/tailwindcss">
+        :root {
+            --primary: #5b6bff;
+            --background-light: #f8fafc;
+            --sidebar-bg: #ffffff;
+            --sidebar-border: #e2e8f0;
+            --sidebar-text: #64748b;
+            --sidebar-active-bg: #f1f5f9;
+            --sidebar-active-text: #334155;
+        }
+        body { font-family: 'Inter', sans-serif; }
+        .sidebar-active {
+            background-color: var(--sidebar-active-bg);
+            color: var(--sidebar-active-text);
+            font-weight: 600;
+        }
+        .sidebar-link {
+            @apply flex items-center gap-4 px-6 py-3.5 text-slate-500 hover:bg-slate-50 transition-all duration-200;
+        }
+        .sidebar-link .material-symbols-outlined {
+            @apply text-[24px];
+            font-variation-settings: 'FILL' 0, 'wght' 400;
+        }
+        .sidebar-active .material-symbols-outlined {
+            font-variation-settings: 'FILL' 1, 'wght' 400;
+            color: #475569;
+        }
+        .sidebar-category {
+            @apply px-6 pt-8 pb-3 text-[11px] font-bold uppercase tracking-[0.1em] text-slate-400;
+        }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+    </style>
+</head>
+<body class="bg-[var(--background-light)] text-slate-800 min-h-screen flex">
+<aside class="w-72 bg-[var(--sidebar-bg)] border-r border-[var(--sidebar-border)] flex-shrink-0 flex flex-col h-screen sticky top-0 overflow-hidden">
+<div class="p-8 pb-2">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 bg-[var(--primary)] rounded-xl flex items-center justify-center shadow-lg shadow-indigo-100">
+<span class="material-symbols-outlined text-white text-xl">smartphone</span>
+</div>
+<h1 class="font-bold text-xl tracking-tight text-slate-900">StoreManager</h1>
+</div>
+</div>
+<nav class="flex-1 overflow-y-auto py-4">
+<div class="sidebar-category">TỔNG QUAN</div>
+<a class="sidebar-link" href="?page=dashboard">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="text-[15px]">Bảng điều khiển</span>
+</a>
+<a class="sidebar-link" href="?page=revenue">
+<span class="material-symbols-outlined">monitoring</span>
+<span class="text-[15px]">Thống kê nhanh</span>
+</a>
+<div class="sidebar-category">KHO &amp; TÀI CHÍNH</div>
+<a class="sidebar-link" href="?page=inventory">
+<span class="material-symbols-outlined">inventory_2</span>
+<span class="text-[15px]">Nhập kho</span>
+</a>
+<a class="sidebar-link" href="?page=sales">
+<span class="material-symbols-outlined">point_of_sale</span>
+<span class="text-[15px]">Bán hàng</span>
+</a>
+<a class="sidebar-link" href="?page=inventory">
+<span class="material-symbols-outlined">assignment_turned_in</span>
+<span class="text-[15px]">Tồn kho</span>
+</a>
+<a class="sidebar-link" href="?page=revenue">
+<span class="material-symbols-outlined">account_balance_wallet</span>
+<span class="text-[15px]">Công nợ</span>
+</a>
+<div class="sidebar-category">QUẢN LÝ</div>
+<a class="sidebar-link sidebar-active" href="?page=customer">
+<span class="material-symbols-outlined">group</span>
+<span class="text-[15px]">Khách hàng</span>
+</a>
+<a class="sidebar-link" href="?page=employee">
+<span class="material-symbols-outlined">person</span>
+<span class="text-[15px]">Nhân viên</span>
+</a>
+<a class="sidebar-link" href="?page=revenue">
+<span class="material-symbols-outlined">bar_chart</span>
+<span class="text-[15px]">Báo cáo doanh thu</span>
+</a>
+<div class="sidebar-category">HỆ THỐNG</div>
+<a class="sidebar-link" href="?page=dashboard">
+<span class="material-symbols-outlined">settings</span>
+<span class="text-[15px]">Cài đặt hệ thống</span>
+</a>
+<a class="sidebar-link" href="?page=dashboard">
+<span class="material-symbols-outlined">shield_person</span>
+<span class="text-[15px]">Phân quyền</span>
+</a>
+</nav>
+<div class="p-6 border-t border-slate-100">
+<div class="flex items-center gap-3 p-2">
+<div class="w-10 h-10 rounded-full bg-orange-100 overflow-hidden shrink-0">
+<img alt="User profile" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCTwMvOWBwhCMmFLHAZbDGNNQsAQSsT0o6hxS6e_ryHmAGYMCAxhMSZyYm6xIczqJhZ4VhvkTlGSNzyM1ElXJcn7LFsUoUq3cDViQPzKa8VCPxdFKmD7-5TZuC8QOVidt7fBC4gUwnr4eerfcOTppfAQ3CRW5OVO09-WKAQlBVpdXcdeTxqo-3IsRoLbImSc0VBuBurUlSqkUwRkk0LhXjGdl11aEvTr9TmQio-dV18Uy64J9fSdnjbY9FEsK0hZ7EdQHgEs1bBVH4"/>
+</div>
+<div class="overflow-hidden flex-1">
+<p class="text-sm font-bold truncate text-slate-900 leading-tight">Admin User</p>
+<p class="text-[12px] text-slate-500 truncate">Quản trị viên</p>
+</div>
+<button class="text-slate-400 hover:text-rose-500 transition-colors">
+<span class="material-symbols-outlined text-xl">logout</span>
+</button>
+</div>
+</div>
+</aside>
+<main class="flex-1 flex flex-col h-screen overflow-hidden">
+<header class="h-20 border-b border-slate-200 bg-white/80 backdrop-blur-md flex items-center justify-between px-8 z-10 shrink-0">
+<div class="flex items-center gap-3">
+<h2 class="text-xl font-bold text-slate-800">Khách hàng</h2>
+<span class="bg-slate-100 text-slate-500 text-[13px] px-3 py-1 rounded-full font-semibold">1,284 người</span>
+</div>
+<div class="flex items-center gap-4">
+<button class="bg-[var(--primary)] hover:bg-opacity-90 text-white px-5 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2 transition-all shadow-lg shadow-indigo-100">
+<span class="material-symbols-outlined text-lg">person_add</span>
+                Thêm khách hàng
+            </button>
+</div>
+</header>
+<div class="flex-1 overflow-y-auto p-8 space-y-6">
+<div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-wrap gap-4 items-center">
+<div class="relative flex-1 min-w-[300px]">
+<span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-xl">search</span>
+<input class="w-full pl-12 pr-4 py-3 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-[var(--primary)] text-sm transition-all" placeholder="Tìm tên, số điện thoại..." type="text"/>
+</div>
+<div class="flex items-center gap-3">
+<select class="bg-slate-50 border-none rounded-xl text-sm py-3 px-6 focus:ring-2 focus:ring-[var(--primary)] font-medium text-slate-600">
+<option>Tất cả nhóm</option>
+<option>Thân thiết</option>
+<option>Mới</option>
+<option>VIP</option>
+</select>
+<button class="p-3 bg-slate-50 text-slate-500 rounded-xl hover:bg-slate-100 transition-colors">
+<span class="material-symbols-outlined text-xl">filter_list</span>
+</button>
+<button class="flex items-center gap-2 px-5 py-3 bg-emerald-50 text-emerald-600 rounded-xl font-bold text-sm hover:bg-emerald-100 transition-colors">
+<span class="material-symbols-outlined text-xl">file_download</span>
+                    Xuất Excel
+                </button>
+</div>
+</div>
+<div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-slate-50/50 border-b border-slate-200">
+<th class="px-6 py-5 text-[11px] font-bold uppercase tracking-wider text-slate-400">Khách hàng</th>
+<th class="px-6 py-5 text-[11px] font-bold uppercase tracking-wider text-slate-400">Số điện thoại</th>
+<th class="px-6 py-5 text-[11px] font-bold uppercase tracking-wider text-slate-400 text-center">Đơn hàng</th>
+<th class="px-6 py-5 text-[11px] font-bold uppercase tracking-wider text-slate-400">Tổng chi tiêu</th>
+<th class="px-6 py-5 text-[11px] font-bold uppercase tracking-wider text-slate-400">Điểm tích lũy</th>
+<th class="px-6 py-5 text-[11px] font-bold uppercase tracking-wider text-slate-400 text-right">Thao tác</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-slate-100">
+<tr class="hover:bg-slate-50 transition-colors group">
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-sm">NH</div>
+<div>
+<p class="font-bold text-sm text-slate-700">Nguyễn Văn Hoàng</p>
+<p class="text-xs text-slate-400">Khách VIP</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-4 text-sm font-medium text-slate-600">0901 234 567</td>
+<td class="px-6 py-4 text-center">
+<span class="bg-slate-100 px-3 py-1 rounded-full text-xs font-bold text-slate-600">12</span>
+</td>
+<td class="px-6 py-4 text-sm font-bold text-[var(--primary)]">85,400,000đ</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-1.5 text-amber-500">
+<span class="material-symbols-outlined text-sm font-fill-1" style="font-variation-settings: 'FILL' 1;">stars</span>
+<span class="text-sm font-bold">8,540</span>
+</div>
+</td>
+<td class="px-6 py-4 text-right space-x-1">
+<button class="text-slate-400 hover:text-[var(--primary)] transition-colors p-2 rounded-lg hover:bg-indigo-50">
+<span class="material-symbols-outlined">history</span>
+</button>
+<button class="text-slate-400 hover:text-slate-600 transition-colors p-2">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</td>
+</tr>
+<tr class="hover:bg-slate-50 transition-colors group">
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 font-bold text-sm">TT</div>
+<div>
+<p class="font-bold text-sm text-slate-700">Trần Thị Thu</p>
+<p class="text-xs text-slate-400">Khách thường</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-4 text-sm font-medium text-slate-600">0988 776 554</td>
+<td class="px-6 py-4 text-center">
+<span class="bg-slate-100 px-3 py-1 rounded-full text-xs font-bold text-slate-600">3</span>
+</td>
+<td class="px-6 py-4 text-sm font-bold text-[var(--primary)]">12,200,000đ</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-1.5 text-amber-500">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">stars</span>
+<span class="text-sm font-bold">1,220</span>
+</div>
+</td>
+<td class="px-6 py-4 text-right space-x-1">
+<button class="text-slate-400 hover:text-[var(--primary)] transition-colors p-2 rounded-lg hover:bg-indigo-50">
+<span class="material-symbols-outlined">history</span>
+</button>
+<button class="text-slate-400 hover:text-slate-600 transition-colors p-2">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</td>
+</tr>
+<tr class="hover:bg-slate-50 transition-colors group">
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center text-rose-600 font-bold text-sm">LM</div>
+<div>
+<p class="font-bold text-sm text-slate-700">Lê Minh Anh</p>
+<p class="text-xs text-slate-400">Khách VIP</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-4 text-sm font-medium text-slate-600">0912 888 999</td>
+<td class="px-6 py-4 text-center">
+<span class="bg-slate-100 px-3 py-1 rounded-full text-xs font-bold text-slate-600">25</span>
+</td>
+<td class="px-6 py-4 text-sm font-bold text-[var(--primary)]">245,000,000đ</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-1.5 text-amber-500">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">stars</span>
+<span class="text-sm font-bold">24,500</span>
+</div>
+</td>
+<td class="px-6 py-4 text-right space-x-1">
+<button class="text-slate-400 hover:text-[var(--primary)] transition-colors p-2 rounded-lg hover:bg-indigo-50">
+<span class="material-symbols-outlined">history</span>
+</button>
+<button class="text-slate-400 hover:text-slate-600 transition-colors p-2">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</td>
+</tr>
+</tbody>
+</table>
+<div class="px-6 py-5 border-t border-slate-100 flex items-center justify-between bg-slate-50/30">
+<p class="text-sm text-slate-500 font-medium">Đang xem 1 - 10 trong 1,284 khách hàng</p>
+<div class="flex items-center gap-1.5">
+<button class="p-2 border border-slate-200 rounded-xl hover:bg-white transition-colors disabled:opacity-40" disabled="">
+<span class="material-symbols-outlined text-lg">chevron_left</span>
+</button>
+<button class="w-10 h-10 rounded-xl bg-[var(--primary)] text-white text-sm font-bold shadow-md shadow-indigo-100">1</button>
+<button class="w-10 h-10 rounded-xl hover:bg-white border border-transparent hover:border-slate-200 text-sm font-semibold text-slate-600 transition-all">2</button>
+<button class="w-10 h-10 rounded-xl hover:bg-white border border-transparent hover:border-slate-200 text-sm font-semibold text-slate-600 transition-all">3</button>
+<span class="px-2 text-slate-400 font-medium">...</span>
+<button class="w-10 h-10 rounded-xl hover:bg-white border border-transparent hover:border-slate-200 text-sm font-semibold text-slate-600 transition-all">129</button>
+<button class="p-2 border border-slate-200 rounded-xl hover:bg-white transition-colors">
+<span class="material-symbols-outlined text-lg">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-8">
+<div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+<div class="flex items-center justify-between mb-6">
+<h3 class="font-bold text-slate-800">Lịch sử mua hàng gần đây</h3>
+<a class="text-xs text-[var(--primary)] font-bold hover:underline" href="#">Xem tất cả</a>
+</div>
+<div class="space-y-4">
+<div class="flex items-center justify-between p-4 rounded-2xl bg-slate-50 border border-slate-100">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-xl bg-white border border-slate-200 flex items-center justify-center">
+<span class="material-symbols-outlined text-[var(--primary)] text-2xl">smartphone</span>
+</div>
+<div>
+<p class="text-sm font-bold text-slate-700">iPhone 15 Pro Max 256GB</p>
+<p class="text-[12px] text-slate-400 font-medium">12/05/2024 • HD-55241</p>
+</div>
+</div>
+<p class="text-[11px] font-bold bg-emerald-100 text-emerald-600 px-3 py-1 rounded-full uppercase tracking-wider">Hoàn thành</p>
+</div>
+<div class="flex items-center justify-between p-4 rounded-2xl bg-slate-50 border border-slate-100">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-xl bg-white border border-slate-200 flex items-center justify-center">
+<span class="material-symbols-outlined text-[var(--primary)] text-2xl">headphones</span>
+</div>
+<div>
+<p class="text-sm font-bold text-slate-700">AirPods Pro Gen 2</p>
+<p class="text-[12px] text-slate-400 font-medium">08/05/2024 • HD-55238</p>
+</div>
+</div>
+<p class="text-[11px] font-bold bg-emerald-100 text-emerald-600 px-3 py-1 rounded-full uppercase tracking-wider">Hoàn thành</p>
+</div>
+</div>
+</div>
+<div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+<div class="flex items-center justify-between mb-6">
+<h3 class="font-bold text-slate-800">Lịch sử bảo hành</h3>
+<a class="text-xs text-[var(--primary)] font-bold hover:underline" href="#">Xem tất cả</a>
+</div>
+<div class="space-y-4">
+<div class="flex items-center justify-between p-4 rounded-2xl bg-white border-l-4 border-amber-400 shadow-sm border-y border-r border-slate-100">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center">
+<span class="material-symbols-outlined text-amber-500 text-2xl">build</span>
+</div>
+<div>
+<p class="text-sm font-bold text-slate-700">Thay màn hình iPhone 13</p>
+<p class="text-[12px] text-slate-400 font-medium">Hẹn trả: 15/05/2024</p>
+</div>
+</div>
+<p class="text-[10px] font-bold bg-amber-100 text-amber-600 px-3 py-1 rounded uppercase tracking-wider">Đang xử lý</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+
+</body></html>
+
+
+
+
+
+
+

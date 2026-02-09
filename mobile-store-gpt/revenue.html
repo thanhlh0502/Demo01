@@ -1,0 +1,372 @@
+﻿<!DOCTYPE html>
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Reports - Manager</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#197fe6",
+                        "nav-bg": "#ffffff",
+                        "background-light": "#f8fafc",
+                        "sidebar-text": "#64748b",
+                        "sidebar-active-bg": "#f1f5f9",
+                        "sidebar-active-text": "#1e293b",
+                    },
+                    fontFamily: {
+                        "display": ["Inter"]
+                    },
+                    borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" },
+                },
+            },
+        }
+    </script>
+<style type="text/tailwindcss">
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .sidebar-item-active {
+            @apply bg-sidebar-active-bg text-sidebar-active-text font-semibold;
+        }
+    </style>
+</head>
+<body class="bg-background-light text-slate-900 transition-colors duration-200">
+<div class="flex min-h-screen overflow-hidden">
+<aside class="w-72 flex-shrink-0 border-r border-slate-200 bg-white flex flex-col sticky top-0 h-screen z-40">
+<div class="p-6 flex items-center gap-3 text-primary">
+<div class="size-8">
+<svg fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+<path d="M44 4H30.6666V17.3334H17.3334V30.6666H4V44H44V4Z" fill="currentColor"></path>
+</svg>
+</div>
+<h1 class="text-slate-900 text-lg font-bold leading-tight tracking-tight">Manager</h1>
+</div>
+<nav class="flex-1 px-4 space-y-8 mt-2 overflow-y-auto">
+<div>
+<p class="px-4 mb-4 text-[11px] font-bold uppercase tracking-widest text-slate-400">TỔNG QUAN</p>
+<div class="space-y-1">
+<a class="flex items-center gap-4 px-4 py-2.5 text-[15px] font-medium text-slate-600 hover:bg-slate-50 rounded-lg transition-colors" href="?page=dashboard">
+<span class="material-symbols-outlined text-slate-500">grid_view</span>
+                        Bảng điều khiển
+                    </a>
+<a class="flex items-center gap-4 px-4 py-2.5 text-[15px] font-medium text-slate-600 hover:bg-slate-50 rounded-lg transition-colors" href="?page=revenue">
+<span class="material-symbols-outlined text-slate-500">trending_up</span>
+                        Thống kê nhanh
+                    </a>
+</div>
+</div>
+<div>
+<p class="px-4 mb-4 text-[11px] font-bold uppercase tracking-widest text-slate-400">KHO &amp; TÀI CHÍNH</p>
+<div class="space-y-1">
+<a class="flex items-center gap-4 px-4 py-2.5 text-[15px] font-medium text-slate-600 hover:bg-slate-50 rounded-lg transition-colors" href="?page=inventory">
+<span class="material-symbols-outlined text-slate-500">archive</span>
+                        Nhập kho
+                    </a>
+<a class="flex items-center gap-4 px-4 py-2.5 text-[15px] font-medium text-slate-600 hover:bg-slate-50 rounded-lg transition-colors" href="?page=sales">
+<span class="material-symbols-outlined text-slate-500">point_of_sale</span>
+                        Bán hàng
+                    </a>
+<a class="flex items-center gap-4 px-4 py-2.5 text-[15px] font-medium text-slate-600 hover:bg-slate-50 rounded-lg transition-colors" href="?page=inventory">
+<span class="material-symbols-outlined text-slate-500">inventory_2</span>
+                        Tồn kho
+                    </a>
+<a class="flex items-center gap-4 px-4 py-2.5 text-[15px] font-medium text-slate-600 hover:bg-slate-50 rounded-lg transition-colors" href="?page=revenue">
+<span class="material-symbols-outlined text-slate-500">account_balance_wallet</span>
+                        Công nợ
+                    </a>
+</div>
+</div>
+<div>
+<p class="px-4 mb-4 text-[11px] font-bold uppercase tracking-widest text-slate-400">QUẢN LÝ</p>
+<div class="space-y-1">
+<a class="flex items-center gap-4 px-4 py-2.5 text-[15px] font-medium text-slate-600 hover:bg-slate-50 rounded-lg transition-colors" href="?page=customer">
+<span class="material-symbols-outlined text-slate-500">group</span>
+                        Khách hàng
+                    </a>
+<a class="flex items-center gap-4 px-4 py-2.5 text-[15px] font-medium text-slate-600 hover:bg-slate-50 rounded-lg transition-colors" href="?page=employee">
+<span class="material-symbols-outlined text-slate-500">person</span>
+                        Nhân viên
+                    </a>
+<a class="flex items-center gap-4 px-4 py-2.5 text-[15px] sidebar-item-active rounded-lg transition-colors" href="?page=revenue">
+<span class="material-symbols-outlined">bar_chart</span>
+                        Báo cáo doanh thu
+                    </a>
+</div>
+</div>
+<div>
+<p class="px-4 mb-4 text-[11px] font-bold uppercase tracking-widest text-slate-400">HỆ THỐNG</p>
+<div class="space-y-1">
+<a class="flex items-center gap-4 px-4 py-2.5 text-[15px] font-medium text-slate-600 hover:bg-slate-50 rounded-lg transition-colors" href="?page=dashboard">
+<span class="material-symbols-outlined text-slate-500">settings</span>
+                        Cài đặt hệ thống
+                    </a>
+<a class="flex items-center gap-4 px-4 py-2.5 text-[15px] font-medium text-slate-600 hover:bg-slate-50 rounded-lg transition-colors" href="?page=employee">
+<span class="material-symbols-outlined text-slate-500">admin_panel_settings</span>
+                        Phân quyền
+                    </a>
+</div>
+</div>
+</nav>
+<div class="p-4 border-t border-slate-100 mt-auto">
+<div class="flex items-center gap-3 p-2">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10 border border-slate-200 shadow-sm" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCTcsmdH6Ry5c7pD_INzKNaHZLi9XaiIP8mgu6XNT7yNgiFgzn-srb6nPorckFWxS4htrDC5Yshj4fg68tkZVbvikH3SD8dCjf8tNDYPmnriXdQZ_98mRh0gjcLgeLUaohDejblpSXLU__YtGm2CTYRqbJLTSNvFw6nbgoeB2N610ymgIESj4oWPAJTlhgVoBXAIxkD06VEMe8ISxyR1xSqK8M9Cgc29Lb-HebwFbZVH4hOcqQwZ4HdaK0wz_giF2KuabInsR5msY0");'></div>
+<div class="flex flex-col min-w-0">
+<span class="text-sm font-bold truncate text-slate-900">Admin User</span>
+<span class="text-[10px] text-slate-500 uppercase font-bold tracking-tighter">Store Manager</span>
+</div>
+</div>
+</div>
+</aside>
+<div class="flex-1 flex flex-col min-w-0 overflow-y-auto">
+<header class="flex items-center justify-between border-b border-slate-200 bg-white px-8 py-3 sticky top-0 z-30 h-16">
+<div class="flex-1 max-w-xl">
+<div class="relative">
+<div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
+<span class="material-symbols-outlined text-xl">search</span>
+</div>
+<input class="w-full bg-slate-100 border-none rounded-lg py-2 pl-10 pr-4 text-sm focus:ring-1 focus:ring-primary placeholder:text-slate-500" placeholder="Search analytics..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-4 ml-4">
+<button class="relative p-2 text-slate-600 hover:bg-slate-100 rounded-full">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full"></span>
+</button>
+<button class="p-2 text-slate-600 hover:bg-slate-100 rounded-full">
+<span class="material-symbols-outlined">help_outline</span>
+</button>
+</div>
+</header>
+<main class="p-8 max-w-[1200px] mx-auto w-full">
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
+<div class="flex flex-col gap-1">
+<h2 class="text-slate-900 text-3xl font-black leading-tight tracking-tight">Revenue Analytics</h2>
+<div class="flex items-center gap-2 text-slate-500 text-sm font-normal">
+<span class="material-symbols-outlined text-sm">sync</span>
+<span>Connected to Google Sheets • Updated 2m ago</span>
+</div>
+</div>
+<div class="flex gap-3">
+<button class="flex items-center justify-center rounded-lg h-10 px-4 bg-white border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors">
+<span class="material-symbols-outlined mr-2 text-lg">calendar_today</span>
+<span>Custom Range</span>
+</button>
+<button class="flex items-center justify-center rounded-lg h-10 px-4 bg-primary text-white text-sm font-bold tracking-wide hover:bg-primary/90 shadow-sm transition-colors">
+<span class="material-symbols-outlined mr-2 text-lg">download</span>
+<span>Export</span>
+</button>
+</div>
+</div>
+<div class="flex mb-8">
+<div class="flex h-11 w-full max-w-lg items-center justify-center rounded-xl bg-slate-200 p-1">
+<label class="flex cursor-pointer h-full grow items-center justify-center rounded-lg px-2 has-[:checked]:bg-white has-[:checked]:shadow-sm has-[:checked]:text-primary text-slate-600 text-sm font-semibold transition-all">
+<span class="truncate">Today</span>
+<input class="hidden" name="time-range" type="radio" value="Today"/>
+</label>
+<label class="flex cursor-pointer h-full grow items-center justify-center rounded-lg px-2 has-[:checked]:bg-white has-[:checked]:shadow-sm has-[:checked]:text-primary text-slate-600 text-sm font-semibold transition-all">
+<span class="truncate">7 Days</span>
+<input checked="" class="hidden" name="time-range" type="radio" value="Last 7 Days"/>
+</label>
+<label class="flex cursor-pointer h-full grow items-center justify-center rounded-lg px-2 has-[:checked]:bg-white has-[:checked]:shadow-sm has-[:checked]:text-primary text-slate-600 text-sm font-semibold transition-all">
+<span class="truncate">Month</span>
+<input class="hidden" name="time-range" type="radio" value="This Month"/>
+</label>
+<label class="flex cursor-pointer h-full grow items-center justify-center rounded-lg px-2 has-[:checked]:bg-white has-[:checked]:shadow-sm has-[:checked]:text-primary text-slate-600 text-sm font-semibold transition-all">
+<span class="truncate">Quarter</span>
+<input class="hidden" name="time-range" type="radio" value="Quarter"/>
+</label>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+<div class="flex flex-col gap-2 rounded-xl p-6 bg-white border border-slate-200 shadow-sm">
+<div class="flex justify-between items-start">
+<p class="text-slate-500 text-xs font-bold uppercase tracking-widest">Total Revenue</p>
+<div class="p-2 bg-blue-50 rounded-lg">
+<span class="material-symbols-outlined text-primary">payments</span>
+</div>
+</div>
+<p class="text-slate-900 text-3xl font-bold">$12,450.00</p>
+<div class="flex items-center gap-1 mt-1">
+<span class="material-symbols-outlined text-emerald-600 text-sm">trending_up</span>
+<p class="text-emerald-600 text-sm font-bold">+12.5% <span class="text-slate-400 font-normal ml-1">vs last period</span></p>
+</div>
+</div>
+<div class="flex flex-col gap-2 rounded-xl p-6 bg-white border border-slate-200 shadow-sm">
+<div class="flex justify-between items-start">
+<p class="text-slate-500 text-xs font-bold uppercase tracking-widest">Gross Profit</p>
+<div class="p-2 bg-emerald-50 rounded-lg">
+<span class="material-symbols-outlined text-emerald-600">analytics</span>
+</div>
+</div>
+<p class="text-slate-900 text-3xl font-bold">$4,200.00</p>
+<div class="flex items-center gap-1 mt-1">
+<span class="material-symbols-outlined text-emerald-600 text-sm">trending_up</span>
+<p class="text-emerald-600 text-sm font-bold">+8.2% <span class="text-slate-400 font-normal ml-1">vs last period</span></p>
+</div>
+</div>
+<div class="flex flex-col gap-2 rounded-xl p-6 bg-white border border-slate-200 shadow-sm">
+<div class="flex justify-between items-start">
+<p class="text-slate-500 text-xs font-bold uppercase tracking-widest">Average Ticket</p>
+<div class="p-2 bg-amber-50 rounded-lg">
+<span class="material-symbols-outlined text-amber-600">shopping_cart</span>
+</div>
+</div>
+<p class="text-slate-900 text-3xl font-bold">$450.00</p>
+<div class="flex items-center gap-1 mt-1">
+<span class="material-symbols-outlined text-red-500 text-sm">trending_down</span>
+<p class="text-red-500 text-sm font-bold">-2.1% <span class="text-slate-400 font-normal ml-1">vs last period</span></p>
+</div>
+</div>
+</div>
+<div class="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-8 shadow-sm mb-8">
+<div class="flex justify-between items-start mb-6">
+<div>
+<h3 class="text-slate-900 text-xl font-bold leading-tight">Revenue Trends</h3>
+<p class="text-slate-500 text-sm">Daily sales performance analysis</p>
+</div>
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-2">
+<div class="w-3 h-3 rounded-full bg-primary"></div>
+<span class="text-xs text-slate-500 font-medium">This Week</span>
+</div>
+<div class="flex items-center gap-2">
+<div class="w-3 h-3 rounded-full bg-slate-200"></div>
+<span class="text-xs text-slate-500 font-medium">Last Week</span>
+</div>
+</div>
+</div>
+<div class="flex min-h-[300px] flex-1 flex-col gap-8 py-4">
+<svg fill="none" height="240" preserveAspectRatio="none" viewBox="0 0 1000 250" width="100%" xmlns="http://www.w3.org/2000/svg">
+<path d="M0 200C50 180 100 220 150 140C200 60 250 80 300 100C350 120 400 50 450 70C500 90 550 180 600 160C650 140 700 230 750 210C800 190 850 40 900 20C950 0 1000 50 1000 50V250H0V200Z" fill="url(#paint0_linear)"></path>
+<path d="M0 200C50 180 100 220 150 140C200 60 250 80 300 100C350 120 400 50 450 70C500 90 550 180 600 160C650 140 700 230 750 210C800 190 850 40 900 20C950 0 1000 50 1000 50" stroke="#197fe6" stroke-linecap="round" stroke-width="4"></path>
+<defs>
+<linearGradient gradientUnits="userSpaceOnUse" id="paint0_linear" x1="500" x2="500" y1="0" y2="250">
+<stop stop-color="#197fe6" stop-opacity="0.2"></stop>
+<stop offset="1" stop-color="#197fe6" stop-opacity="0"></stop>
+</linearGradient>
+</defs>
+</svg>
+<div class="flex justify-between border-t border-slate-100 pt-4 px-2">
+<p class="text-slate-400 text-[11px] font-bold uppercase">Mon</p>
+<p class="text-slate-400 text-[11px] font-bold uppercase">Tue</p>
+<p class="text-slate-400 text-[11px] font-bold uppercase">Wed</p>
+<p class="text-slate-400 text-[11px] font-bold uppercase">Thu</p>
+<p class="text-slate-400 text-[11px] font-bold uppercase">Fri</p>
+<p class="text-slate-400 text-[11px] font-bold uppercase">Sat</p>
+<p class="text-slate-400 text-[11px] font-bold uppercase">Sun</p>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-1 xl:grid-cols-2 gap-8">
+<div class="flex flex-col gap-6 rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
+<div class="flex justify-between items-center">
+<h3 class="text-slate-900 text-lg font-bold leading-tight">Sales by Brand</h3>
+<button class="p-2 text-slate-400 hover:text-primary transition-colors">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+<div class="flex items-center justify-center py-6 relative">
+<div class="size-48 rounded-full border-[16px] border-primary relative flex items-center justify-center">
+<div class="absolute inset-[-16px] border-[16px] border-slate-100 rounded-full" style="clip-path: polygon(50% 50%, 0 0, 100% 0, 100% 30%, 50% 50%)"></div>
+<div class="absolute inset-[-16px] border-[16px] border-amber-400 rounded-full" style="clip-path: polygon(50% 50%, 100% 30%, 100% 70%, 50% 50%)"></div>
+<div class="absolute inset-[-16px] border-[16px] border-emerald-400 rounded-full" style="clip-path: polygon(50% 50%, 100% 70%, 50% 100%, 0 100%, 0 70%, 50% 50%)"></div>
+<div class="flex flex-col items-center">
+<span class="text-3xl font-black text-slate-900">1,248</span>
+<span class="text-[10px] uppercase tracking-widest font-bold text-slate-400">Total Units</span>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<div class="flex items-center justify-between p-3 rounded-lg bg-slate-50">
+<div class="flex items-center gap-2">
+<div class="w-2.5 h-2.5 rounded-full bg-primary"></div>
+<span class="text-xs font-medium">Apple</span>
+</div>
+<span class="text-xs font-bold">45%</span>
+</div>
+<div class="flex items-center justify-between p-3 rounded-lg bg-slate-50">
+<div class="flex items-center gap-2">
+<div class="w-2.5 h-2.5 rounded-full bg-amber-400"></div>
+<span class="text-xs font-medium">Samsung</span>
+</div>
+<span class="text-xs font-bold">28%</span>
+</div>
+</div>
+</div>
+<div class="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
+<div class="flex justify-between items-center mb-2">
+<h3 class="text-slate-900 text-lg font-bold leading-tight">Top Products</h3>
+<button class="text-primary text-xs font-bold hover:underline">View All</button>
+</div>
+<div class="flex flex-col">
+<div class="flex items-center justify-between py-3 border-b border-slate-100 last:border-0">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-lg bg-slate-50 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-xl">smartphone</span>
+</div>
+<div>
+<p class="text-sm font-bold text-slate-900">iPhone 15 Pro</p>
+<p class="text-xs text-slate-500">12 Sales</p>
+</div>
+</div>
+<p class="text-sm font-bold text-slate-900">$3,597</p>
+</div>
+<div class="flex items-center justify-between py-3 border-b border-slate-100 last:border-0">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-lg bg-slate-50 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-xl">smartphone</span>
+</div>
+<div>
+<p class="text-sm font-bold text-slate-900">S24 Ultra</p>
+<p class="text-xs text-slate-500">8 Sales</p>
+</div>
+</div>
+<p class="text-sm font-bold text-slate-900">$2,800</p>
+</div>
+<div class="flex items-center justify-between py-3 border-b border-slate-100 last:border-0">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-lg bg-slate-50 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-xl">watch</span>
+</div>
+<div>
+<p class="text-sm font-bold text-slate-900">Watch Series 9</p>
+<p class="text-xs text-slate-500">3 Sales</p>
+</div>
+</div>
+<p class="text-sm font-bold text-slate-900">$850</p>
+</div>
+</div>
+</div>
+</div>
+<footer class="mt-16 py-8 border-t border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4 text-slate-400 text-xs">
+<p>© 2024 Store Analytics Engine.</p>
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-2">
+<div class="w-2 h-2 rounded-full bg-emerald-500"></div>
+<span class="font-medium">Live Data</span>
+</div>
+<a class="hover:text-primary transition-colors" href="#">Support</a>
+<a class="hover:text-primary transition-colors" href="#">Docs</a>
+</div>
+</footer>
+</main>
+</div>
+</div>
+
+</body></html>
+
+
+
+
+
+
+
