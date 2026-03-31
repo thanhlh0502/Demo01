@@ -1,0 +1,654 @@
+================================================================================
+  MASTER DATA MIGRATION TOOL - HƯỚNG DẪN SỬ DỤNG (User Guide)
+  Version: 2.0
+  Platform: .NET 8 Console Application
+================================================================================
+
+MỤC LỤC
+--------
+  1.  TỔNG QUAN
+  2.  CẤU TRÚC THƯ MỤC & Ý NGHĨA TỪNG FILE
+  3.  YÊU CẦU HỆ THỐNG
+  4.  BƯỚC 1 - CẤU HÌNH CONNECTION STRINGS
+  5.  BƯỚC 2 - CẤU HÌNH TRADING PARTNERS
+  6.  BƯỚC 3 - CẤU HÌNH DANH SÁCH TABLE
+  7.  BƯỚC 4 - CHẠY SQL SCRIPT KHỞI TẠO (CHỈ LẦN ĐẦU)
+  8.  BƯỚC 5 - BUILD VÀ CHẠY TOOL
+  9.  QUY TRÌNH MIGRATE HÀNG NGÀY
+  10. QUY TRÌNH CUTOVER (LẦN CHẠY CUỐI CÙNG)
+  11. KIỂM TRA KẾT QUẢ
+  12. XỬ LÝ LỖI THƯỜNG GẶP
+  13. CÂU HỎI THƯỜNG GẶP (FAQ)
+
+
+================================================================================
+1. TỔNG QUAN
+================================================================================
+
+Tool migrate (đồng bộ) master data từ môi trường Source sang Target cho các
+Trading Partner được chỉ định. Tool xử lý:
+
+  - INSERT  : thêm mới rows chưa có ở Target
+  - UPDATE  : cập nhật rows đã thay đổi ở Source
+  - DELETE  : xoá rows đã bị xoá ở Source (chỉ khi bật EnableDelete)
+  - ID TRANSLATION : chuyển đổi Identity ID giữa 2 môi trường (tự động)
+  - FK TRANSLATION : chuyển đổi cột Foreign Key theo ID đã dịch (tự động)
+
+KIẾN TRÚC 3 DATABASE:
+  ┌──────────────────────────┐     ┌──────────────────────────────────────┐
+  │   SOURCE SERVER (đọc)    │     │       TARGET SERVER (ghi)            │
+  │                          │     │                                      │
+  │  [SourceDB]              │────▶│  [StagingMigrateDB]  [TargetDB]     │
+  │  Chỉ SELECT              │     │  Stg_*, Map_*,       Data thật       │
+  │                          │     │  Migration_SyncLog   INSERT/UPDATE   │
+  └──────────────────────────┘     └──────────────────────────────────────┘
+
+  - TargetDB KHÔNG bị thêm bất kỳ bảng infrastructure nào.
+  - Tất cả bảng tạm (Stg_*, Map_*, Migration_SyncLog) đều ở StagingMigrateDB.
+  - StagingMigrateDB phải nằm CÙNG SQL Server instance với TargetDB
+    (để cross-DB query hoạt động).
+
+QUY TRÌNH MỖI TABLE (5 bước):
+  1. Extract  : đọc data từ Source → BulkCopy vào Stg_[TableName] (StagingMigrate)
+  2. FK Trans : dịch FK columns trong Stg_* từ Source ID → Target ID
+  3. Upsert   : MERGE Stg_* → TargetDB (INSERT new / UPDATE existing)
+  4. Map Sync : cập nhật Map_[TableName] (Source_ID ↔ Target_ID)
+  5. Log      : ghi kết quả vào Migration_SyncLog
+
+
+================================================================================
+2. CẤU TRÚC THƯ MỤC & Ý NGHĨA TỪNG FILE
+================================================================================
+
+MasterDataMigration/
+│
+├── appsettings.json          <<< FILE CẤU HÌNH CHÍNH (cần sửa file này)
+├── Program.cs                    Entry point
+├── MasterDataMigration.csproj    Project file (.NET 8)
+├── guide.txt                     Hướng dẫn sử dụng (file này)
+│
+├── Models/
+│   ├── TableConfig.cs            Định nghĩa cấu hình mỗi table
+│   ├── MigrationSettings.cs      Cấu hình tổng thể
+│   └── SyncRunResult.cs          Kết quả mỗi lần chạy
+│
+├── Services/
+│   ├── MigrationRunner.cs        Điều phối toàn bộ quy trình
+│   ├── StagingService.cs         Extract Source → Staging (có TP filter)
+│   ├── ForeignKeyTranslationService.cs  Dịch FK IDs trong Staging
+│   ├── UpsertService.cs          Merge Staging → Target
+│   ├── DeleteDetectionService.cs Phát hiện rows đã xoá trên Source
+│   ├── SchemaHelper.cs           Tạo Stg_* và Map_* tự động qua SP
+│   ├── TpFilterBuilder.cs        Xây dựng WHERE clause lọc theo TP
+│   └── DbNames.cs                Quy ước 3-part name cross-DB
+│
+└── Sql/
+    └── 001_CreateMigrationObjects.sql   <<< CHẠY TRÊN STAGING DB (lần đầu)
+
+
+================================================================================
+3. YÊU CẦU HỆ THỐNG
+================================================================================
+
+  - .NET 8 SDK (hoặc cao hơn)
+    Download: https://dotnet.microsoft.com/download/dotnet/8.0
+    Kiểm tra: dotnet --version
+
+  - SQL Server 2017 trở lên (cần STRING_AGG function)
+
+  - Tài khoản SQL cần có quyền:
+    + Source Server  : SELECT trên các table cần migrate
+    + Target Server  : INSERT, UPDATE, DELETE trên TargetDB
+                       CREATE TABLE, EXEC stored procedure trên StagingMigrateDB
+
+  - StagingMigrateDB và TargetDB phải CÙNG SQL Server instance
+    (cross-DB query qua 3-part name: [StagingMigrate].[dbo].[Stg_X])
+
+
+================================================================================
+4. BƯỚC 1 - CẤU HÌNH CONNECTION STRINGS
+================================================================================
+
+Mở file appsettings.json, sửa 3 connection strings:
+
+  "SourceConnectionString":
+      Server   = IP/tên Source SQL Server
+      Database = tên database Source
+      >>> Tool chỉ ĐỌC từ đây (SELECT), không ghi gì
+
+  "TargetConnectionString":
+      Server   = IP/tên Target SQL Server
+      Database = tên database Target (production/environment mới)
+      >>> Tool GHI data vào đây (INSERT/UPDATE/DELETE)
+
+  "StagingConnectionString":
+      Server   = CÙNG SERVER với TargetConnectionString (bắt buộc!)
+      Database = tên StagingMigrate DB (VD: TL_StagingMigrate)
+      >>> Lưu bảng tạm Stg_*, Map_*, Migration_SyncLog
+
+Ví dụ:
+  "SourceConnectionString":  "Server=10.0.1.50;Database=EDI_UAT;User Id=migrator;Password=P@ss;TrustServerCertificate=True;",
+  "TargetConnectionString":  "Server=10.0.2.100;Database=EDI_Prod;User Id=migrator;Password=P@ss;TrustServerCertificate=True;",
+  "StagingConnectionString": "Server=10.0.2.100;Database=TL_StagingMigrate;User Id=migrator;Password=P@ss;TrustServerCertificate=True;",
+
+LƯU Ý:
+  - StagingConnectionString PHẢI cùng Server với TargetConnectionString
+  - Tên database Staging khác với Target (không được trùng)
+  - Giữ "TrustServerCertificate=True;" để tránh lỗi SSL certificate
+
+
+================================================================================
+5. BƯỚC 2 - CẤU HÌNH TRADING PARTNERS
+================================================================================
+
+Trong appsettings.json, mục "TradingPartners":
+
+  "TradingPartners": [
+    { "CustID1": 36723, "CustID2": 28099 },
+    { "CustID1": 36723, "CustID2": 28418 },
+    { "CustID1": 36723, "CustID2": 8031  }
+  ]
+
+  - CustID1 : Mã customer (thường là 1 giá trị cho toàn bộ danh sách)
+  - CustID2 : Mã trading partner cụ thể
+
+Mỗi lần tool chạy, chỉ extract data thuộc các cặp (CustID1, CustID2) này.
+
+
+================================================================================
+6. BƯỚC 3 - CẤU HÌNH DANH SÁCH TABLE
+================================================================================
+
+Trong appsettings.json, mục "Tables" là mảng các table cần migrate.
+
+!!!! THỨ TỰ RẤT QUAN TRỌNG !!!!
+  - Table CHA phải đứng TRƯỚC table CON
+  - VD: Inform → InFormProc (vì InFormProc.InFormID → Inform.InFormID)
+  - Sai thứ tự → FK translation thất bại → data con sai hoặc bị xoá
+
+--------------------------------------------------------------------------
+CÁC THUỘC TÍNH CỦA TỪNG TABLE
+--------------------------------------------------------------------------
+
+a) TableName (bắt buộc)
+   Tên bảng trên database, phân biệt chính xác chữ hoa/thường.
+   VD: "Address", "InFormProc"
+
+b) PrimaryKeyColumn (bắt buộc)
+   Tên cột Primary Key. Cần khai báo đúng ngay cả khi tên không phải "ID".
+   VD: "ValidationID", "EmailAddressID"
+
+c) TradingPartnerColumns (bắt buộc, có thể rỗng [])
+   Cột dùng lọc data theo Trading Partner, ánh xạ với CustID1/CustID2.
+
+   - Rỗng []:
+     >>> Không filter theo TP, extract TẤT CẢ rows (bảng global/reference)
+     >>> Dùng khi bảng là lookup không phụ thuộc TP nào (VD: ReplaceType, Statement)
+
+   - 1 cột: ["CustomerID"]
+     >>> WHERE [CustomerID] IN (36723)
+     >>> Dùng khi bảng có 1 cột xác định customer (ánh xạ CustID1)
+     >>> VD: Product, Calendar, CustomerEmailAddress
+
+   - 2 cột: ["CustID1", "CustID2"]
+     >>> WHERE (CustID1=36723 AND CustID2=28099) OR (CustID1=36723 AND CustID2=28418) OR ...
+     >>> Dùng khi bảng có đủ 2 cột TP (ánh xạ CustID1 + CustID2)
+     >>> VD: Inform, ValidationLine, ContainerType
+
+d) AllowWildcardMatch (mặc định: false)
+   Lấy thêm rows có giá trị 0 ở cột TP (rows áp dụng cho "tất cả" TP).
+
+   - TradingPartnerColumns có 1 cột:
+     true  → WHERE [CustomerID] IN (36723) OR [CustomerID] = 0
+     false → WHERE [CustomerID] IN (36723)
+
+   - TradingPartnerColumns có 2 cột:
+     true  → (CustID1=36723 AND CustID2 IN (...)) OR (CustID1=36723 AND CustID2=0)
+     false → (CustID1=36723 AND CustID2 IN (...))
+
+   Thường bật cho bảng cấu hình chung (ConfigINI, CrossReferences...)
+
+e) UpdatedDateColumn (mặc định: null)
+   Cột datetime để làm delta sync (chỉ lấy rows thay đổi từ lần trước).
+
+   - Đặt tên cột: "ModifiedDate" → delta sync, hiệu quả hơn
+   - Đặt null     → full extract mỗi lần, MERGE vẫn xử lý đúng INSERT/UPDATE
+
+f) BusinessKeyColumns (mặc định: rỗng [])
+   Dùng cho bảng xác định tính duy nhất bằng composite key thay vì Identity.
+
+   TRƯỜNG HỢP DÙNG:
+   - PK là NON-identity (giá trị giống nhau ở Source và Target)
+   - PK là Identity NHƯNG link đến bảng con qua business value (không phải ID)
+     (VD: Parts được link qua CustID1+CustID2+PartNumber, không phải PartID)
+   - Bảng junction có composite PK (VD: CustomerEmailGroupAddress)
+
+   VD: "BusinessKeyColumns": ["CustID1", "CustID2", "PartNumber"]
+   >>> Tool MERGE ON (CustID1, CustID2, PartNumber) thay vì ID
+   >>> Tạo Map_X lưu business key + timestamp (không lưu Source/Target ID)
+
+   KHÔNG DÙNG khi:
+   - PK là identity VÀ có bảng con FK đến PK đó
+     (cần Map_X Source_ID→Target_ID để FK translation hoạt động)
+
+   CẦN ĐỦ UNIQUE:
+   Tập hợp cột trong BusinessKeyColumns phải đảm bảo mỗi row là duy nhất.
+   Nếu không đủ unique → lỗi duplicate key khi MERGE.
+
+g) ForeignKeys (mặc định: rỗng {})
+   Khai báo các cột FK trỏ đến bảng cha có Identity PK.
+   Format: { "TênCộtFK": "TênBảngCha" }
+   VD: { "ValidationID": "Validation", "ValidationLineID": "ValidationLine" }
+
+   Tool sẽ chạy trước FK Translation (trước khi Upsert vào Target):
+     UPDATE Stg_[Table] SET [ValidationID] = Map_Validation.Target_ID
+     WHERE [ValidationID] = Map_Validation.Source_ID
+
+   CÁC QUY TẮC:
+   - Chỉ khai báo FK đến bảng cha có IDENTITY PK
+   - KHÔNG khai báo FK đến bảng cha dùng BusinessKeyColumns
+     (giá trị đã giống nhau ở 2 môi trường, không cần dịch)
+   - Bảng cha phải được migrate TRƯỚC trong danh sách Tables
+
+h) TradingPartnerJoin (mặc định: null)
+   Dùng cho bảng CON không có cột CustID trực tiếp, cần JOIN lên bảng cha
+   để lọc theo TP.
+
+   Khi có TradingPartnerJoin, tool sinh SQL extract dạng:
+     SELECT T.* FROM [InFormProc] T
+     INNER JOIN [Inform] J1 ON T.[InFormID] = J1.[InFormID]
+     WHERE J1.[CustID1] = 36723 AND J1.[CustID2] IN (...)
+
+   Cấu trúc:
+   "TradingPartnerColumns": [],
+   "TradingPartnerJoin": {
+     "Joins": [
+       {
+         "ParentTable"    : "Inform",
+         "ChildForeignKey": "InFormID",
+         "ParentPrimaryKey": "InFormID"
+       }
+     ],
+     "TradingPartnerColumns": ["CustID1", "CustID2"],
+     "AllowWildcardMatch": false
+   }
+
+   Hỗ trợ JOIN nhiều cấp (ông → cha → con):
+   "Joins": [
+     {"ParentTable": "ValidationLine", "ChildForeignKey": "ValidationLineID", "ParentPrimaryKey": "ValidationLineID"},
+     {"ParentTable": "Validation",     "ChildForeignKey": "ValidationID",     "ParentPrimaryKey": "ValidationID"}
+   ]
+
+   LƯU Ý:
+   - Khi dùng TradingPartnerJoin, TradingPartnerColumns ở ngoài phải là []
+   - ForeignKeys vẫn cần khai báo riêng để dịch ID khi Upsert
+   - PHẢI có TradingPartnerJoin nếu bảng không có cột TP trực tiếp.
+     Nếu bỏ qua → tool sẽ extract TẤT CẢ rows (không filter TP)
+
+i) ExcludeColumns (mặc định: rỗng [])
+   Các cột không migrate.
+   VD: ["RowVersion", "ComputedTotal"]
+
+j) SupportDelete (mặc định: false)
+   Cho phép delete detection với bảng này khi EnableDelete=true (global).
+
+--------------------------------------------------------------------------
+CÁC THUỘC TÍNH GLOBAL (ngoài mảng Tables)
+--------------------------------------------------------------------------
+
+k) BulkCopyBatchSize (mặc định: 10000)
+   Số rows mỗi batch khi copy Source → Staging. Tăng nếu table lớn.
+
+l) BulkCopyTimeout (mặc định: 600 giây = 10 phút)
+   Timeout BulkCopy. Tăng nếu table rất lớn.
+
+m) CommandTimeout (mặc định: 300 giây = 5 phút)
+   Timeout SQL commands (MERGE, UPDATE, DELETE).
+
+n) EnableDelete (mặc định: false)
+   Bật tính năng xoá toàn cục.
+   false → KHÔNG xoá dù SupportDelete=true
+   true  → xoá rows đã bị xoá trên Source (chỉ table có SupportDelete=true)
+   >>> Chỉ bật ở lần cutover cuối cùng
+
+--------------------------------------------------------------------------
+VÍ DỤ CẤU HÌNH MẪU
+--------------------------------------------------------------------------
+
+// Table global, không phụ thuộc TP, có ModifiedDate:
+{
+  "TableName": "ReplaceType",
+  "PrimaryKeyColumn": "Id",
+  "TradingPartnerColumns": [],
+  "UpdatedDateColumn": "ModifiedDate",
+  "ForeignKeys": {},
+  "ExcludeColumns": []
+}
+
+// Table lọc theo 2 cột TP, Identity PK, có bảng con FK đến nó:
+{
+  "TableName": "Inform",
+  "PrimaryKeyColumn": "InFormID",
+  "TradingPartnerColumns": ["CustID1", "CustID2"],
+  "AllowWildcardMatch": false,
+  "UpdatedDateColumn": "ModifiedDate",
+  "ForeignKeys": {},
+  "ExcludeColumns": []
+}
+
+// Table con, không có TP trực tiếp, FK đến Inform (identity):
+{
+  "TableName": "InFormProc",
+  "PrimaryKeyColumn": "InFormID",
+  "TradingPartnerColumns": [],
+  "TradingPartnerJoin": {
+    "Joins": [
+      {"ParentTable": "Inform", "ChildForeignKey": "InFormID", "ParentPrimaryKey": "InFormID"}
+    ],
+    "TradingPartnerColumns": ["CustID1", "CustID2"]
+  },
+  "UpdatedDateColumn": "ModifiedDate",
+  "BusinessKeyColumns": ["InFormID", "Action"],
+  "ForeignKeys": { "InFormID": "Inform" },
+  "ExcludeColumns": []
+}
+
+// Table dùng business key (PK identity nhưng link qua business value):
+{
+  "TableName": "Parts",
+  "PrimaryKeyColumn": "PartID",
+  "TradingPartnerColumns": ["CustID1", "CustID2"],
+  "UpdatedDateColumn": "ModifiedDate",
+  "BusinessKeyColumns": ["CustID1", "CustID2", "PartNumber", "SKU"],
+  "ForeignKeys": {},
+  "ExcludeColumns": []
+}
+
+// Bảng junction (composite PK), cha là identity, cần FK translation:
+{
+  "TableName": "CustomerEmailGroupAddress",
+  "PrimaryKeyColumn": "EmailGroupID",
+  "TradingPartnerColumns": [],
+  "TradingPartnerJoin": {
+    "Joins": [
+      {"ParentTable": "CustomerEmailGroup", "ChildForeignKey": "EmailGroupID", "ParentPrimaryKey": "EmailGroupID"}
+    ],
+    "TradingPartnerColumns": ["CustomerID"]
+  },
+  "UpdatedDateColumn": "ModifiedDate",
+  "BusinessKeyColumns": ["EmailGroupID", "EmailAddressID"],
+  "ForeignKeys": {
+    "EmailGroupID"   : "CustomerEmailGroup",
+    "EmailAddressID" : "CustomerEmailAddress"
+  },
+  "ExcludeColumns": []
+}
+
+
+================================================================================
+7. BƯỚC 4 - CHẠY SQL SCRIPT KHỞI TẠO (CHỈ 1 LẦN ĐẦU TIÊN)
+================================================================================
+
+CHỈ CHẠY 1 LẦN trước khi dùng tool lần đầu.
+
+Mở SSMS hoặc Azure Data Studio, kết nối TARGET SQL Server:
+  1. Mở file: Sql/001_CreateMigrationObjects.sql
+  2. Đổi context sang StagingMigrate DB (hoặc script đã tự USE đúng DB)
+  3. Chạy script
+
+Script sẽ tạo trên StagingMigrateDB:
+  - Table  : [dbo].[Migration_SyncLog]  (log mỗi lần chạy, per table)
+  - SP     : [dbo].[sp_Migration_CreateStagingTable]
+  - SP     : [dbo].[sp_Migration_CreateMappingTable]
+  - SP     : [dbo].[sp_Migration_CreateBusinessKeyMappingTable]
+
+LƯU Ý:
+  - Chạy trên StagingMigrateDB, KHÔNG chạy trên TargetDB hay SourceDB
+  - TargetDB sẽ KHÔNG có bất kỳ bảng infrastructure nào
+  - Không cần chạy lại ở những lần migrate sau
+
+
+================================================================================
+8. BƯỚC 5 - BUILD VÀ CHẠY TOOL
+================================================================================
+
+Mở PowerShell / Command Prompt:
+
+  a) Di chuyển đến thư mục project:
+     cd C:\_Project\Demo\migrateData\MasterDataMigration
+
+  b) Build (chỉ cần khi thay đổi code):
+     dotnet build
+
+  c) Chạy migration:
+     dotnet run
+
+OUTPUT MẪU:
+  [14:25:23 INF] === Migration Sync Run completed. 21/25 tables succeeded. ===
+  [14:25:23 INF] [OK]   Inform:         Extracted=92,   Inserted=92,  Updated=0,  Deleted=0, Duration=00:00:00.1094306
+  [14:25:23 INF] [OK]   InFormProc:     Extracted=163,  Inserted=0,   Updated=163,Deleted=0, Duration=00:00:00.1167314
+  [14:25:23 INF] [FAIL] ExternalTable:  Extracted=39,   Inserted=0,   Updated=0,  Deleted=0, Duration=00:00:00.2190439
+  [14:25:23 ERR]   Error: Cannot insert the value NULL into column 'PlantID'...
+
+  - Extracted : rows đọc từ Source (lọc theo TP + delta nếu có UpdatedDateColumn)
+  - Inserted  : rows mới INSERT vào Target
+  - Updated   : rows đã UPDATE trên Target
+  - Deleted   : rows đã DELETE trên Target (chỉ khi EnableDelete=true)
+  - [OK]/[FAIL]: kết quả cuối cùng của từng table
+
+
+================================================================================
+9. QUY TRÌNH MIGRATE HÀNG NGÀY (DELTA SYNC)
+================================================================================
+
+Chạy hàng ngày trong giai đoạn trước cutover để đồng bộ tăng dần:
+
+  1. Đảm bảo appsettings.json đúng:
+     - Connection strings đúng môi trường
+     - TradingPartners đúng danh sách
+     - EnableDelete = false
+
+  2. Chạy tool:
+     dotnet run
+
+  3. Kiểm tra kết quả:
+     - Tất cả table hiện [OK] trong console
+     - Xem file log: logs/migration-YYYYMMDD.log
+     - Query trên StagingMigrateDB:
+       SELECT * FROM [Migration_SyncLog] ORDER BY Id DESC;
+
+  LẦN CHẠY ĐẦU (full sync):
+    - GetLastSyncTime → NULL → WHERE không có điều kiện ngày
+    - Extract TẤT CẢ rows thuộc TP
+
+  LẦN CHẠY SAU (delta sync):
+    - GetLastSyncTime → lấy MAX(RunCompletedAt) WHERE Success=1 AND TableName=X
+    - Extract CHỈ rows có [UpdatedDateColumn] > LastSyncTime
+    - Bảng có UpdatedDateColumn=null → luôn full extract (vẫn xử lý đúng INSERT/UPDATE)
+
+  TỪNG TABLE CÓ TIMELINE RIÊNG:
+    - Table A thành công lúc 14:00 → lần sau delta từ 14:00
+    - Table B fail → lần sau vẫn full sync (không có record Success=1)
+
+
+================================================================================
+10. QUY TRÌNH CUTOVER (LẦN CHẠY CUỐI CÙNG)
+================================================================================
+
+Khi sẵn sàng chuyển sang Target:
+
+  1. Dừng tất cả hoạt động ghi trên Source (nếu có thể)
+
+  2. Sửa appsettings.json:
+     "EnableDelete": true
+
+  3. Đảm bảo các table cần xoá có:
+     "SupportDelete": true
+
+  4. Chạy tool lần cuối:
+     dotnet run
+
+  5. Lần chạy này sẽ:
+     - INSERT/UPDATE data thay đổi mới nhất
+     - Phát hiện và xoá rows đã bị xoá trên Source (cho table có SupportDelete=true)
+     - Xoá theo thứ tự ngược (bảng con trước, bảng cha sau)
+
+  6. Kiểm tra kết quả (xem mục 11)
+
+  7. Sau cutover:
+     - Đổi lại "EnableDelete": false
+     - Chuyển traffic production sang TargetDB
+
+
+================================================================================
+11. KIỂM TRA KẾT QUẢ
+================================================================================
+
+a) Console output / log file:
+   - Mỗi table: [OK] hoặc [FAIL] + Extracted/Inserted/Updated/Deleted
+
+b) Query trên StagingMigrateDB:
+   -- Xem log các lần chạy (per-table tracking)
+   SELECT * FROM [Migration_SyncLog] ORDER BY Id DESC;
+
+   -- Xem mapping Identity table (Source_ID → Target_ID)
+   SELECT * FROM [Map_Inform];
+   SELECT * FROM [Map_ValidationLine];
+
+   -- Xem mapping Business Key table (composite key + timestamp)
+   SELECT * FROM [Map_Parts];
+   SELECT * FROM [Map_ContainerType];
+
+   -- Xem data staging (chỉ chứa data lần chạy cuối, truncate mỗi lần)
+   SELECT COUNT(*) FROM [Stg_InFormProc];
+
+c) Query trên TargetDB:
+   -- Đếm rows đã migrate
+   SELECT COUNT(*) FROM [dbo].[Inform];
+   SELECT COUNT(*) FROM [dbo].[InFormProc];
+
+   -- Kiểm tra FK đúng (VD InFormProc → Inform)
+   SELECT p.InFormID, p.Action, i.CustID1, i.CustID2
+   FROM [InFormProc] p
+   JOIN [Inform] i ON p.InFormID = i.InFormID;
+
+
+================================================================================
+12. XỬ LÝ LỖI THƯỜNG GẶP
+================================================================================
+
+LỖI: "Invalid object name 'sp_Migration_CreateStagingTable'"
+  >>> Chưa chạy 001_CreateMigrationObjects.sql trên StagingMigrateDB
+  >>> Xem Bước 4 (mục 7)
+
+LỖI: "Cannot insert the value NULL into column 'X'"
+  a) Cột 'X' là cột thường trên TargetDB: data source có NULL, Target không cho NULL
+     → Kiểm tra constraint trên TargetDB, điều chỉnh lại
+  b) Cột 'X' là trong Map_* table (VD: Map_ExternalCustomer.PlantID NULL):
+     → Cột đó trong BusinessKeyColumns có data NULL trên Source
+     → Fix: bỏ cột đó khỏi BusinessKeyColumns (nếu không cần để phân biệt unique)
+
+LỖI: "Invalid column name 'CustomerID'" / "Invalid column name 'X'"
+  a) Tên cột trong config sai (typo): kiểm tra lại tên cột thực tế trên DB
+  b) Cột không tồn tại trên TargetDB: tool tạo Stg_* từ Target schema,
+     nếu Source có cột đó nhưng Target không có → lỗi BulkCopy
+     → Fix: thêm cột vào ExcludeColumns hoặc thêm cột vào Target
+
+LỖI: "An item with the same key has already been added. Key: [TableName]"
+  >>> Trong mảng Tables có 2 entry cùng TableName
+  >>> Fix: xoá bản trùng
+
+LỖI: "Violation of PRIMARY KEY constraint 'PK_Map_X'"
+  >>> BusinessKeyColumns không đủ unique (có 2 rows Source giống nhau trên tất cả cột key)
+  >>> Fix: thêm cột vào BusinessKeyColumns cho đủ unique
+
+LỖI: "Timeout expired"
+  >>> Table quá lớn hoặc query chậm
+  >>> Tăng BulkCopyTimeout và CommandTimeout trong config
+
+LỖI: Login failed / network error
+  >>> Kiểm tra connection string: IP, database name, username, password
+
+LỖI: Table FAIL nhưng các table khác OK
+  >>> Tool tiếp tục chạy khi 1 table lỗi
+  >>> Sửa config/data rồi chạy lại, table đã OK sẽ delta sync (nhanh),
+      table FAIL sẽ được retry
+
+TRANSACTION & ROLLBACK:
+  - Mỗi table chạy trong 1 transaction riêng (staging + target)
+  - Nếu lỗi → rollback toàn bộ table đó, các table khác không bị ảnh hưởng
+  - Chạy lại tool → table lỗi sẽ được retry từ đầu
+
+CLEANUP KHI CẦN CHẠY LẠI TỪ ĐẦU MỘT TABLE:
+  -- Chạy trên StagingMigrateDB
+  DELETE FROM [Migration_SyncLog] WHERE TableName = 'TênBảng';
+  DROP TABLE IF EXISTS [Map_TênBảng];
+  -- Lần sau tool sẽ tạo lại Map_* và full sync
+
+
+================================================================================
+13. CÂU HỎI THƯỜNG GẶP (FAQ)
+================================================================================
+
+H: Chạy lại tool nhiều lần có bị trùng data không?
+Đ: KHÔNG. Tool dùng Map_* table để phân biệt INSERT mới / UPDATE cũ.
+   Rows đã có → UPDATE. Rows mới → INSERT.
+
+H: ID trên Target có giống Source không?
+Đ: KHÔNG (với bảng Identity). Target tự sinh ID khác.
+   Tool lưu ánh xạ Source_ID → Target_ID trong Map_*.
+   FK cũng được tự động dịch trước khi Upsert.
+
+H: Tôi xoá data trong Stg_* sau mỗi lần chạy có bị lỗi không?
+Đ: KHÔNG. Staging tables bị TRUNCATE tự động đầu mỗi lần chạy.
+   Quan trọng là giữ nguyên Map_* và Migration_SyncLog.
+
+H: Table không có ModifiedDate thì sao?
+Đ: Set "UpdatedDateColumn": null → mỗi lần chạy full extract.
+   Vẫn xử lý đúng INSERT/UPDATE nhờ Map table hoặc BusinessKeyColumns.
+
+H: Khi nào dùng BusinessKeyColumns?
+Đ: Khi bảng xác định tính duy nhất qua business value thay vì Identity ID:
+   1. PK không phải identity (giá trị giống nhau ở Source và Target)
+   2. Bảng được link đến các bảng khác qua business value (không phải PK)
+   3. Bảng junction với composite PK
+   Không dùng khi bảng có Identity PK và có bảng con FK đến PK đó
+   (cần Map Source_ID→Target_ID để FK translation hoạt động).
+
+H: Khi nào dùng ForeignKeys?
+Đ: Khi cột FK trỏ đến bảng cha có IDENTITY PK.
+   Tool sẽ dịch giá trị FK từ Source_ID sang Target_ID (qua Map_ParentTable).
+   KHÔNG cần khai báo FK đến bảng cha dùng BusinessKeyColumns
+   (giá trị đã giống nhau, không cần dịch).
+
+H: AllowWildcardMatch khác gì CustID2=0 trong TradingPartners?
+Đ: - CustID2=0 trong TradingPartners: danh sách TP cấu hình (không dùng trong code)
+   - AllowWildcardMatch=true: lấy thêm rows trong DATA có CustID2=0
+     (rows cấu hình chung cho tất cả TP của 1 customer)
+   2 cái độc lập nhau.
+
+H: Thêm table mới vào config cần làm gì?
+Đ: Thêm entry vào "Tables" (đúng thứ tự dependency).
+   Lần chạy tiếp theo tool tự tạo Stg_* và Map_* qua SP.
+
+H: Muốn chạy lại 1 table từ đầu (full sync) mà không ảnh hưởng table khác?
+Đ: Chạy SQL trên StagingMigrateDB:
+     DELETE FROM [Migration_SyncLog] WHERE TableName = 'TênBảng';
+     DROP TABLE IF EXISTS [Map_TênBảng];
+   Rồi chạy lại tool. Các table khác không bị ảnh hưởng.
+
+H: Có thể chạy tool trên máy khác 2 SQL Server không?
+Đ: CÓ. Tool chỉ cần kết nối mạng đến cả 2 SQL Server.
+   Có thể chạy trên máy local, CI/CD server, hoặc bất kỳ máy nào có .NET 8.
+
+H: StagingMigrate DB có cần backup không?
+Đ: Nên backup Map_* tables vì chúng chứa ánh xạ Source_ID → Target_ID.
+   Nếu mất Map_*, tool sẽ tạo lại nhưng có thể tạo duplicate trên Target
+   (không biết row nào đã INSERT).
+   Migration_SyncLog cũng nên giữ để delta sync hoạt động đúng.
+
+
+================================================================================
+  HẾT HƯỚNG DẪN
+  Liên hệ đội phát triển nếu cần hỗ trợ thêm.
+================================================================================
